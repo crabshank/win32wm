@@ -240,6 +240,8 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
     GetWindowRect( foreGnd, &rw );
     GetWindowRect( dsk, &r );
     GetTaskbarPos( &taskBarRect );
+    int tbw=-(taskBarRect.right|taskBarRect.left);
+    int tbh=-(taskBarRect.bottom|taskBarRect.top);
 	switch( msg )
 	{
 	case MOD_INIT:
@@ -303,8 +305,8 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
             // bl - tl - (b-h,l)
             // br - tl - (b-h,r-w)
 
-            int tl[2]={crnrsFw.tl[0]+1,crnrsFw.tl[1]};
-            int t2=MAX(0,MIN(tl[0]-1,crnrs_dsk.bl[0]));
+            int tl[2]={crnrsFw.tl[0],crnrsFw.tl[1]};
+            int t2=MAX(0,MIN(tl[0],crnrs_dsk.bl[0]));
             if(mni==1){ //tr
                 tl[1]=crnrsFw.br[1]-crnrsFw2.width+1;
 
@@ -318,8 +320,8 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
                 tl[1]=crnrsFw.br[1]-crnrsFw2.width+1;
             }
             int l2=MAX(0,MIN(tl[1],crnrs_dsk.tr[1]));
-            int w2=MAX(0,MIN(crnrsFw2.width,crnrs_dsk.width-l2-(taskBarRect.right|taskBarRect.left)));
-            int h2=MAX(0,MIN(crnrsFw2.height,crnrs_dsk.height-t2-(taskBarRect.bottom|taskBarRect.top)));
+            int w2=MAX(0,MIN(crnrsFw2.width,crnrs_dsk.width-l2+tbw));
+            int h2=MAX(0,MIN(crnrsFw2.height,crnrs_dsk.height-t2+tbh));
 
                 SetWindowPos( foreGnd, 0, l2,t2,w2,h2, 0 );
 
