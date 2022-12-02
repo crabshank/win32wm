@@ -71,7 +71,7 @@ int threadStatus;					// current status of the mouse handling thread
 int snapToAt = 5;					// snap to desktop borders at X pixels
 BOOL snap;
 
-typedef struct 
+typedef struct
 {
 	LONG winID;
 	RECT pos;
@@ -90,7 +90,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 	WNDCLASS wnd;
 	MSG msg;
 	DWORD threadId;
-	
+
 	BOOL showConfig = FALSE;
 
 	// Avoid running multiple copies of this thing. One can never know what will happen
@@ -131,7 +131,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 	}
 	else
 		threadStatus = DRAG_ON;
-	
+
 	if( showConfig )
 	{
 		PostMessage( hwndMain, MOD_SETUP, 0, 0 );
@@ -213,6 +213,8 @@ void GetTaskbarPos( RECT *out )
 
 LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
+    BOOL vert=(useVertical && wParam == atomVertical)?TRUE:FALSE;
+    BOOL mxz=(useMaximize && wParam == atomMaximize)?TRUE:FALSE;
 	switch( msg )
 	{
 	case MOD_INIT:
@@ -240,7 +242,7 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 		break;
 	case WM_HOTKEY:
 		// Vertical maximize
-		if( useVertical && wParam == atomVertical )
+		if( vert==true || mxz==TRUE )
 		{
 			int height, top;
 			RECT r;
@@ -257,14 +259,14 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 				height -= (taskBarRect.top | taskBarRect.bottom);
 			}
 			GetWindowRect( GetForegroundWindow(), &r );
-			
+
 			LONG id = GetWindowLong( GetForegroundWindow(), GWL_ID );
 			if( r.bottom - r.top == height )
 			{ // Window already vertically maximized
 				if( IsWindowInCache( id ) )
 				{
 					RECT *prevPos = GetWindowPosFromCache( id );
-					SetWindowPos( GetForegroundWindow(), 0, prevPos->left, prevPos->top, 
+					SetWindowPos( GetForegroundWindow(), 0, prevPos->left, prevPos->top,
 						prevPos->right - prevPos->left, prevPos->bottom-prevPos->top, 0 );
 				}
 			}
@@ -276,7 +278,10 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 
 		}
 		// Horizontal maximize
-		else if( useHorizontal && wParam == atomHorizontal )
+		if(
+            ( (useHorizontal && wParam == atomHorizontal) && vert==FALSE ) ||
+            (mxz==TRUE)
+          )
 		{
 			int width, left;
 			RECT r;
@@ -309,7 +314,7 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 				PutWindowPosIntoCache( id, &r );
 				SetWindowPos( foreGnd, 0, left, r.top, width, r.bottom-r.top, 0 );
 			}
-			
+
 		}
 		// simple maximize
 		else if( useMaximize && wParam == atomMaximize )
@@ -466,7 +471,7 @@ DWORD WINAPI MouseDragThread( LPVOID lParam )
 					RECT oldSnaps = snappedTo;
 
 					GetWindowRect( foregnd, &r );
-					
+
 					// need  to check desktop size every time, because the taskbar can be auto hiding
 					if( !IsMDIWindow( foregnd ) )
 						GetWindowRect( GetDesktopWindow(), &desk );
@@ -517,7 +522,7 @@ DWORD WINAPI MouseDragThread( LPVOID lParam )
 							else
 							{
 								winCoords.left += pt.x - prevPoint.x;
-								if( winCoords.left > (desk.left+snapToAt) || winCoords.left<desk.left ) 
+								if( winCoords.left > (desk.left+snapToAt) || winCoords.left<desk.left )
 								{
 									snappedTo.left =FALSE;
 									left = winCoords.left;
@@ -589,7 +594,7 @@ DWORD WINAPI MouseDragThread( LPVOID lParam )
 						 * OK, the point with the MDI windows is that they must be positioned using the
 						 * client area coordinates of the window. This means that it is impossible to
 						 * get the window coordinates using GetWindowRect and position the window
-						 * using SetWindowPos, because the coordinate 0,0 of the MDI window is the 
+						 * using SetWindowPos, because the coordinate 0,0 of the MDI window is the
 						 * top-left corner of the parent window client area. And there is no easy way to
 						 * translate the rectangle of the client area into screen coordinates. So I
 						 * use a hack to determine the border width of the window and translate the
@@ -598,23 +603,23 @@ DWORD WINAPI MouseDragThread( LPVOID lParam )
 						 */
 						HWND parentWnd = GetParent( foregnd );  // GetForegroundWindow();
 						RECT clientRect, parentRect;
-						int borderWidth; 
+						int borderWidth;
 
 						GetWindowRect( parentWnd, &parentRect );
 						GetClientRect( parentWnd, &clientRect );
 						borderWidth = ((parentRect.right - parentRect.left - clientRect.right) / 2);
 
-						if( parentRect.bottom-parentRect.top-clientRect.bottom > 7 
+						if( parentRect.bottom-parentRect.top-clientRect.bottom > 7
 							|| parentRect.right-parentRect.left-clientRect.right > 7) // there's a scrollbar visible in MDI parent window
 						{
-							SetWindowPos( foregnd, 0, left - parentRect.left, 
+							SetWindowPos( foregnd, 0, left - parentRect.left,
 								top - parentRect.top ,
 								r.right - r.left, r.bottom - r.top, 0 );
 						}
 						else
 						{
 							SetWindowPos( foregnd, 0, left - parentRect.right + clientRect.right + borderWidth,
-								top - parentRect.bottom + clientRect.bottom + borderWidth, 
+								top - parentRect.bottom + clientRect.bottom + borderWidth,
 								r.right - r.left, r.bottom - r.top, 0 );
 						}
 					}
@@ -694,15 +699,15 @@ DWORD WINAPI MouseDragThread( LPVOID lParam )
 				{
 					HWND parentWnd = GetParent( foregnd ); // GetForegroundWindow();
 					RECT clientRect, parentRect;
-					int borderWidth; 
+					int borderWidth;
 
 					GetWindowRect( parentWnd, &parentRect );
 					GetClientRect( parentWnd, &clientRect );
 
 					borderWidth = ((parentRect.right - parentRect.left - clientRect.right) / 2);
 
-					SetWindowPos( foregnd, 0, left - parentRect.right + clientRect.right + borderWidth, 
-						top - parentRect.bottom + clientRect.bottom + borderWidth, 
+					SetWindowPos( foregnd, 0, left - parentRect.right + clientRect.right + borderWidth,
+						top - parentRect.bottom + clientRect.bottom + borderWidth,
 						right-left, bottom-top, 0 );
 				}
 			}
