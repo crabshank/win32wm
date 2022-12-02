@@ -48,6 +48,8 @@
 #include "messages.h"
 #include "win32wm.h"
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // Globals
 HWND vwHandle;
@@ -233,10 +235,11 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
     LONG id = GetWindowLong( foreGnd, GWL_ID );
     RECT r; //desktop window
     RECT rw; //foreground window
+    RECT taskBarRect={0,0,0,0}; //foreground window
     HWND dsk = GetDesktopWindow();
     GetWindowRect( foreGnd, &rw );
     GetWindowRect( dsk, &r );
-
+    GetTaskbarPos( &taskBarRect );
 	switch( msg )
 	{
 	case MOD_INIT:
@@ -281,37 +284,44 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
                     mni=i;
                 }
             }
+
             if(mxz==TRUE){
-                SetWindowPos( foreGnd, 0, r.left, r.top,crnrs_dsk.width, crnrs_dsk.height, 0 );
+                SetWindowPos( foreGnd, 0, 0, 0,crnrs_dsk.width, crnrs_dsk.height, 0 );
             }else if(vert==TRUE){
-                SetWindowPos( foreGnd, 0, r.left, r.top, crnrsFw.width, crnrs_dsk.height, 0 );
+                SetWindowPos( foreGnd, 0, 0, 0, crnrsFw.width, crnrs_dsk.height, 0 );
             }else if(horz==TRUE){
-                SetWindowPos( foreGnd, 0, r.left, r.top, crnrs_dsk.width, crnrsFw.height, 0 );
+                SetWindowPos( foreGnd, 0, 0, 0, crnrs_dsk.width, crnrsFw.height, 0 );
             }
 
             GetWindowRect( foreGnd, &rw );
 
             crnrs crnrsFw2={{rw.top,rw.left},{rw.top,rw.right-1},{rw.bottom-1,rw.left},{rw.bottom-1,rw.right-1}, rw.right-rw.left,rw.bottom-rw.top};
 
-            int fp[2]={0,0};
             // tl - tl - (t,l)
 
             // tr - tl - (t,r-w)
             // bl - tl - (b-h,l)
             // br - tl - (b-h,r-w)
-            int tl[2]={crnrsFw.tl[0],crnrsFw.tl[1]};
 
+            int tl[2]={crnrsFw.tl[0]+1,crnrsFw.tl[1]};
+            int t2=MAX(0,MIN(tl[0]-1,crnrs_dsk.bl[0]));
             if(mni==1){ //tr
-                tl[1]=crnrsFw.br[1]-crnrsFw2.width;
+                tl[1]=crnrsFw.br[1]-crnrsFw2.width+1;
+
             }else if(mni==2){ //bl
-                tl[0]=crnrsFw.bl[0]-crnrsFw2.height;
+                tl[0]=crnrsFw.bl[0]-crnrsFw2.height+1;
+                t2=MAX(0,MIN(tl[0],crnrs_dsk.bl[0]));
                 tl[1]=crnrsFw.bl[1];
             }else if(mni==3){ //br
-                tl[0]=crnrsFw.bl[0]-crnrsFw2.height;
-                tl[1]=crnrsFw.br[1]-crnrsFw2.width;
+                tl[0]=crnrsFw.bl[0]-crnrsFw2.height+1;
+                t2=MAX(0,MIN(tl[0],crnrs_dsk.bl[0]));
+                tl[1]=crnrsFw.br[1]-crnrsFw2.width+1;
             }
+            int l2=MAX(0,MIN(tl[1],crnrs_dsk.tr[1]));
+            int w2=MAX(0,MIN(crnrsFw2.width,crnrs_dsk.width-l2-(taskBarRect.right|taskBarRect.left)));
+            int h2=MAX(0,MIN(crnrsFw2.height,crnrs_dsk.height-t2-(taskBarRect.bottom|taskBarRect.top)));
 
-                SetWindowPos( foreGnd, 0, tl[1], tl[0], crnrsFw2.width, crnrsFw2.height, 0 );
+                SetWindowPos( foreGnd, 0, l2,t2,w2,h2, 0 );
 
         }
 		// simple minimize
