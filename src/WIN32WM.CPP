@@ -77,6 +77,19 @@ typedef struct
 	RECT pos;
 } CacheItem;
 
+typedef struct crnrs_s{
+	int tl[2];
+	int tr[2];
+	int bl[2];
+	int br[2];
+	int width;
+	int height;
+}crnrs;
+
+int getSqDist(int c1[2], int c2[2]){
+	return (c2[0]-c1[0])*(c2[0]-c1[0])+(c2[1]-c1[1])*(c2[1]-c1[1]);
+}
+
 // The window position cache that holds information necessary for restoreing windows that are
 // maximized horizontally or vertically
 #define CACHE_SIZE	10
@@ -214,10 +227,16 @@ void GetTaskbarPos( RECT *out )
 LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
     BOOL vert=(useVertical && wParam == atomVertical)?TRUE:FALSE;
+    BOOL horz=(useHorizontal && wParam == atomHorizontal)?TRUE:FALSE;
     BOOL mxz=(useMaximize && wParam == atomMaximize)?TRUE:FALSE;
-    LONG id;
-    RECT r;
-    RECT taskBarRect={0,0,0,0};
+    HWND foreGnd = GetForegroundWindow();
+    LONG id = GetWindowLong( foreGnd, GWL_ID );
+    RECT r; //desktop window
+    RECT rw; //foreground window
+    HWND dsk = GetDesktopWindow();
+    GetWindowRect( foreGnd, &rw );
+    GetWindowRect( dsk, &r );
+
 	switch( msg )
 	{
 	case MOD_INIT:
@@ -244,84 +263,57 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 		PostQuitMessage( 0 );
 		break;
 	case WM_HOTKEY:
-		// Vertical maximize
-		if( vert==true || mxz==TRUE )
-		{
-			int height, top;
-			GetWindowRect( GetDesktopWindow(), &r );
-			height = r.bottom - r.top;
+        if (vert ==TRUE || mxz==TRUE || horz==TRUE){
 
-			top = 0;
-			GetTaskbarPos( &taskBarRect );
-			if( taskBarRect.top||taskBarRect.bottom )
-			{
-				top = taskBarRect.top;
-				height -= (taskBarRect.top | taskBarRect.bottom);
-			}
-			GetWindowRect( GetForegroundWindow(), &r );
+            crnrs crnrs_dsk={{r.top,r.left},{r.top,r.right-1},{r.bottom-1,r.left},{r.bottom-1,r.right-1}, r.right-r.left,r.bottom-r.top};//e.g. (0,0) (0,1919) (1079,0) (1079,1919)
 
-			id = GetWindowLong( GetForegroundWindow(), GWL_ID );
-			if( r.bottom - r.top == height )
-			{ // Window already vertically maximized
-				if( IsWindowInCache( id ) )
-				{
-					RECT *prevPos = GetWindowPosFromCache( id );
-					SetWindowPos( GetForegroundWindow(), 0, prevPos->left, prevPos->top,
-						prevPos->right - prevPos->left, prevPos->bottom-prevPos->top, 0 );
-				}
-			}
-			else
-			{ // put window coords into cache
-				if(mxz==FALSE){
-                    PutWindowPosIntoCache( id, &r );
+            crnrs crnrsFw={{rw.top,rw.left},{rw.top,rw.right-1},{rw.bottom-1,rw.left},{rw.bottom-1,rw.right-1}, rw.right-rw.left,rw.bottom-rw.top};
+
+            int sqDists[4]={    getSqDist(crnrs_dsk.tl,crnrsFw.tl),
+                                getSqDist(crnrs_dsk.tr,crnrsFw.tr),
+                                getSqDist(crnrs_dsk.bl,crnrsFw.bl),
+                                getSqDist(crnrs_dsk.br,crnrsFw.br)	};
+            int mn=sqDists[0];
+            int mni=0;
+            for(size_t i=1; i<4; ++i){
+                if(sqDists[i]<mn){
+                    mn=sqDists[i];
+                    mni=i;
                 }
-				SetWindowPos( GetForegroundWindow(), 0, r.left, top, r.right - r.left, height, 0 );
-			}
+            }
+            if(mxz==TRUE){
+                SetWindowPos( foreGnd, 0, r.left, r.top,crnrs_dsk.width, crnrs_dsk.height, 0 );
+            }else if(vert==TRUE){
+                SetWindowPos( foreGnd, 0, r.left, r.top, crnrsFw.width, crnrs_dsk.height, 0 );
+            }else if(horz==TRUE){
+                SetWindowPos( foreGnd, 0, r.left, r.top, crnrs_dsk.width, crnrsFw.height, 0 );
+            }
 
-		}
-		// Horizontal maximize
-		if(
-            ( (useHorizontal && wParam == atomHorizontal) && vert==FALSE ) ||
-            (mxz==TRUE)
-          )
-		{
-			int width, left;
-			RECT taskBarRect;
-			HWND foreGnd = GetForegroundWindow();
+            GetWindowRect( foreGnd, &rw );
 
-			GetWindowRect( GetDesktopWindow(), &r );
-			GetTaskbarPos( &taskBarRect );
+            crnrs crnrsFw2={{rw.top,rw.left},{rw.top,rw.right-1},{rw.bottom-1,rw.left},{rw.bottom-1,rw.right-1}, rw.right-rw.left,rw.bottom-rw.top};
 
-			width = r.right - r.left;
-			left = 0;
-			if( taskBarRect.left || taskBarRect.right )
-			{
-				left = taskBarRect.left;
-				width -= (taskBarRect.right|taskBarRect.left);
-			}
-			GetWindowRect( foreGnd, &r );
-			id = GetWindowLong( foreGnd, GWL_ID );
+            int fp[2]={0,0};
+            // tl - tl - (t,l)
 
-			if( r.right - r.left == width )
-			{
-				if( IsWindowInCache( id ) )
-				{
-					RECT *prev = GetWindowPosFromCache( id );
-					SetWindowPos( foreGnd, 0, prev->left, prev->top, prev->right-prev->left, prev->bottom-prev->top, 0 );
-				}
-			}
-			else
-			{
-                if(mxz==FALSE){
-                    PutWindowPosIntoCache( id, &r );
-                }
-				SetWindowPos( foreGnd, 0, left, r.top, width, r.bottom-r.top, 0 );
-			}
+            // tr - tl - (t,r-w)
+            // bl - tl - (b-h,l)
+            // br - tl - (b-h,r-w)
+            int tl[2]={crnrsFw.tl[0],crnrsFw.tl[1]};
 
-		}
-		if(mxz==TRUE){
-            PutWindowPosIntoCache( id, &r );
-		}
+            if(mni==1){ //tr
+                tl[1]=crnrsFw.br[1]-crnrsFw2.width;
+            }else if(mni==2){ //bl
+                tl[0]=crnrsFw.bl[0]-crnrsFw2.height;
+                tl[1]=crnrsFw.bl[1];
+            }else if(mni==3){ //br
+                tl[0]=crnrsFw.bl[0]-crnrsFw2.height;
+                tl[1]=crnrsFw.br[1]-crnrsFw2.width;
+            }
+
+                SetWindowPos( foreGnd, 0, tl[1], tl[0], crnrsFw2.width, crnrsFw2.height, 0 );
+
+        }
 		// simple minimize
 		else if( useMinimize && wParam == atomMinimize )
 		{
