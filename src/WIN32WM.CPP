@@ -215,6 +215,9 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
     BOOL vert=(useVertical && wParam == atomVertical)?TRUE:FALSE;
     BOOL mxz=(useMaximize && wParam == atomMaximize)?TRUE:FALSE;
+    LONG id;
+    RECT r;
+    RECT taskBarRect={0,0,0,0};
 	switch( msg )
 	{
 	case MOD_INIT:
@@ -245,9 +248,6 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 		if( vert==true || mxz==TRUE )
 		{
 			int height, top;
-			RECT r;
-			RECT taskBarRect = { 0, 0, 0, 0 };
-
 			GetWindowRect( GetDesktopWindow(), &r );
 			height = r.bottom - r.top;
 
@@ -260,7 +260,7 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 			}
 			GetWindowRect( GetForegroundWindow(), &r );
 
-			LONG id = GetWindowLong( GetForegroundWindow(), GWL_ID );
+			id = GetWindowLong( GetForegroundWindow(), GWL_ID );
 			if( r.bottom - r.top == height )
 			{ // Window already vertically maximized
 				if( IsWindowInCache( id ) )
@@ -272,7 +272,9 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 			}
 			else
 			{ // put window coords into cache
-				PutWindowPosIntoCache( id, &r );
+				if(mxz==FALSE){
+                    PutWindowPosIntoCache( id, &r );
+                }
 				SetWindowPos( GetForegroundWindow(), 0, r.left, top, r.right - r.left, height, 0 );
 			}
 
@@ -284,7 +286,6 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
           )
 		{
 			int width, left;
-			RECT r;
 			RECT taskBarRect;
 			HWND foreGnd = GetForegroundWindow();
 
@@ -299,7 +300,7 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 				width -= (taskBarRect.right|taskBarRect.left);
 			}
 			GetWindowRect( foreGnd, &r );
-			LONG id = GetWindowLong( foreGnd, GWL_ID );
+			id = GetWindowLong( foreGnd, GWL_ID );
 
 			if( r.right - r.left == width )
 			{
@@ -311,18 +312,15 @@ LRESULT CALLBACK WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 			}
 			else
 			{
-				PutWindowPosIntoCache( id, &r );
+                if(mxz==FALSE){
+                    PutWindowPosIntoCache( id, &r );
+                }
 				SetWindowPos( foreGnd, 0, left, r.top, width, r.bottom-r.top, 0 );
 			}
 
 		}
-		// simple maximize
-		else if( useMaximize && wParam == atomMaximize )
-		{
-			if( GetWindowLong( GetForegroundWindow(), GWL_STYLE ) & WS_MAXIMIZE	)
-				PostMessage( GetForegroundWindow(), WM_SYSCOMMAND, SC_RESTORE, 0 );
-			else
-				PostMessage( GetForegroundWindow(), WM_SYSCOMMAND, SC_MAXIMIZE, 0 );
+		if(mxz==TRUE){
+            PutWindowPosIntoCache( id, &r );
 		}
 		// simple minimize
 		else if( useMinimize && wParam == atomMinimize )
